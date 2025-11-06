@@ -1,70 +1,87 @@
-import { useState } from 'react'
-import Header from './components/Header'
-import IngredientForm from './components/IngredientForm'
-import NutritionSummary from './components/NutritionSummary'
-import NutrientTable from './components/NutrientTable'
+import { useMemo, useState } from "react";
+import Header from "./components/Header";
+import ApiForm from "./components/ApiForm";
+import ApiList from "./components/ApiList";
+import ActiveApi from "./components/ActiveApi";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+// Utility to make ids
+const uid = () => Math.random().toString(36).slice(2, 10);
 
-function App() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [result, setResult] = useState(null)
-  const [cache, setCache] = useState('')
-
-  const analyze = async (ingredients) => {
-    setLoading(true)
-    setError('')
+export default function App() {
+  const [apis, setApis] = useState(() => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/nutrition/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ingredients }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
-        throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail))
-      }
-
-      const data = await res.json()
-      setResult(data.data)
-      setCache(data.cache)
-    } catch (e) {
-      setError(e.message || 'Failed to analyze ingredients')
-      setResult(null)
-    } finally {
-      setLoading(false)
+      const raw = localStorage.getItem("apis");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
     }
-  }
+  });
+  const [activeId, setActiveId] = useState(() => {
+    try {
+      return localStorage.getItem("activeApiId") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const activeApi = useMemo(() => apis.find((a) => a.id === activeId), [apis, activeId]);
+
+  const persist = (nextApis, nextActiveId = activeId) => {
+    setApis(nextApis);
+    setActiveId(nextActiveId);
+    try {
+      localStorage.setItem("apis", JSON.stringify(nextApis));
+      if (nextActiveId) localStorage.setItem("activeApiId", nextActiveId);
+      else localStorage.removeItem("activeApiId");
+    } catch {}
+  };
+
+  const handleAdd = ({ name, baseUrl }) => {
+    // Enforce: remove before add. If an API is active, block addition.
+    if (activeApi) return;
+    const api = { id: uid(), name, baseUrl };
+    const next = [api, ...apis];
+    persist(next, api.id);
+  };
+
+  const handleRemove = (id) => {
+    const next = apis.filter((a) => a.id !== id);
+    const nextActive = activeId === id ? "" : activeId;
+    persist(next, nextActive);
+  };
+
+  const handleSelect = (api) => {
+    // Selecting sets it active only if none is active; if active exists, block.
+    if (activeApi) return;
+    persist(apis, api.id);
+  };
+
+  const clearActive = () => {
+    persist(apis, "");
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
       <Header />
-      <main className="mx-auto max-w-5xl px-4 pb-16">
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-4">
-            <IngredientForm onAnalyze={analyze} loading={loading} />
-            {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-                {error}
-              </div>
-            )}
-            {cache && (
-              <div className="text-xs text-gray-500">Cache: {cache}</div>
-            )}
-          </div>
-          <div className="space-y-4">
-            <NutritionSummary data={result} />
-            <NutrientTable data={result} />
-          </div>
-        </div>
-      </main>
-      <footer className="py-8 text-center text-xs text-gray-500">
-        Built with Edamam Nutrition API
-      </footer>
-    </div>
-  )
-}
 
-export default App
+      <main className="max-w-5xl mx-auto px-4 pb-16 space-y-6">
+        <ActiveApi api={activeApi} onClear={clearActive} />
+
+        <section className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Add API</h2>
+            <ApiForm onAdd={handleAdd} disabled={!!activeApi} />
+            {activeApi && (
+              <p className="text-xs text-amber-400">You currently have an active API. Clear it before adding a new one.</p>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Your APIs</h2>
+            <ApiList apis={apis} onRemove={handleRemove} onSelect={handleSelect} />
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
