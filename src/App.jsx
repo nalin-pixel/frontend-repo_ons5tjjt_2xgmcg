@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Header from "./components/Header";
 import ApiForm from "./components/ApiForm";
 import ApiList from "./components/ApiList";
@@ -24,40 +24,42 @@ export default function App() {
     }
   });
 
-  const activeApi = useMemo(() => apis.find((a) => a.id === activeId), [apis, activeId]);
-
-  const persist = (nextApis, nextActiveId = activeId) => {
-    setApis(nextApis);
-    setActiveId(nextActiveId);
+  useEffect(() => {
     try {
-      localStorage.setItem("apis", JSON.stringify(nextApis));
-      if (nextActiveId) localStorage.setItem("activeApiId", nextActiveId);
+      localStorage.setItem("apis", JSON.stringify(apis));
+    } catch {}
+  }, [apis]);
+
+  useEffect(() => {
+    try {
+      if (activeId) localStorage.setItem("activeApiId", activeId);
       else localStorage.removeItem("activeApiId");
     } catch {}
-  };
+  }, [activeId]);
+
+  const activeApi = useMemo(() => apis.find((a) => a.id === activeId), [apis, activeId]);
 
   const handleAdd = ({ name, baseUrl }) => {
     // Enforce: remove before add. If an API is active, block addition.
     if (activeApi) return;
     const api = { id: uid(), name, baseUrl };
-    const next = [api, ...apis];
-    persist(next, api.id);
+    setApis((prev) => [api, ...prev]);
+    setActiveId(api.id);
   };
 
   const handleRemove = (id) => {
-    const next = apis.filter((a) => a.id !== id);
-    const nextActive = activeId === id ? "" : activeId;
-    persist(next, nextActive);
+    setApis((prev) => prev.filter((a) => a.id !== id));
+    setActiveId((prevActive) => (prevActive === id ? "" : prevActive));
   };
 
   const handleSelect = (api) => {
     // Selecting sets it active only if none is active; if active exists, block.
     if (activeApi) return;
-    persist(apis, api.id);
+    setActiveId(api.id);
   };
 
   const clearActive = () => {
-    persist(apis, "");
+    setActiveId("");
   };
 
   return (
@@ -78,7 +80,7 @@ export default function App() {
 
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Your APIs</h2>
-            <ApiList apis={apis} onRemove={handleRemove} onSelect={handleSelect} />
+            <ApiList apis={apis} onRemove={handleRemove} onSelect={handleSelect} disabled={!!activeApi} />
           </div>
         </section>
       </main>

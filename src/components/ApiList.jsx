@@ -1,6 +1,6 @@
 import { Trash2, Plus } from "lucide-react";
 
-export default function ApiList({ apis, onRemove, onSelect }) {
+export default function ApiList({ apis, onRemove, onSelect, disabled = false }) {
   if (!apis.length) {
     return (
       <div className="rounded-xl border bg-card text-card-foreground shadow p-6 text-center">
@@ -23,7 +23,8 @@ export default function ApiList({ apis, onRemove, onSelect }) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => onSelect(api)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition"
+              disabled={disabled}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="h-4 w-4" /> Use
             </button>
